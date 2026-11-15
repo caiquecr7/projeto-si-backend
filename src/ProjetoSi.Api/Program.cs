@@ -5,11 +5,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ProjetoSi.Api.Common.Biometria;
 using ProjetoSi.Api.Common.Endpoints;
+using ProjetoSi.Api.Common.Observabilidade;
 using ProjetoSi.Api.Common.Seguranca;
 using ProjetoSi.Api.Domain;
 using ProjetoSi.Api.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+
+ConfiguracaoLogs.AplicarConfiguracao(builder.Logging);
+ConfiguracaoLogs.AplicarFiltroDebugLogs(builder.Logging, builder.Configuration);
 
 builder.Services.AddDbContext<AppDbContext>(options => options
     .UseNpgsql(builder.Configuration.GetConnectionString("Postgres"))
@@ -26,11 +30,12 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 builder.Services.AddSingleton<VerificadorSenha>();
 builder.Services.AddSingleton<GeradorToken>();
+builder.Services.AddTransient<HandlerCorrelacaoMlApi>();
 builder.Services.AddHttpClient<IVerificadorBiometrico, VerificadorBiometricoMlApi>((provedor, cliente) =>
 {
     var opcoes = provedor.GetRequiredService<IOptions<BiometriaOptions>>().Value;
     cliente.BaseAddress = new Uri(opcoes.MlApiUrl);
-});
+}).AddHttpMessageHandler<HandlerCorrelacaoMlApi>();
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins(builder.Configuration.GetSection("Cors:Origens").Get<string[]>() ?? [])
@@ -54,6 +59,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseMiddleware<MiddlewareCorrelacaoLogs>();
 app.UseCors();
 app.MapearEndpoints("/api");
 

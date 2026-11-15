@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using ProjetoSi.Api.Domain;
 
@@ -11,11 +12,19 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
 
     private readonly HttpClient _httpClient;
     private readonly BiometriaOptions _opcoes;
+    private readonly ILogger<VerificadorBiometricoMlApi> _logger;
+    private readonly TimeProvider _relogio;
 
-    public VerificadorBiometricoMlApi(HttpClient httpClient, IOptions<BiometriaOptions> opcoes)
+    public VerificadorBiometricoMlApi(
+        HttpClient httpClient,
+        IOptions<BiometriaOptions> opcoes,
+        ILogger<VerificadorBiometricoMlApi>? logger = null,
+        TimeProvider? relogio = null)
     {
         _httpClient = httpClient;
         _opcoes = opcoes.Value;
+        _logger = logger ?? NullLogger<VerificadorBiometricoMlApi>.Instance;
+        _relogio = relogio ?? TimeProvider.System;
 
         if (_httpClient.BaseAddress is null && !string.IsNullOrWhiteSpace(_opcoes.MlApiUrl))
         {
@@ -34,10 +43,46 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
             vetores.Select(vetor => vetor.Valores).ToArray(),
             RecordSamples: false);
 
+        var dimensao = vetores.Count > 0 ? vetores[0].Valores.Length : 0;
+        var inicio = _relogio.GetTimestamp();
+        _logger.LogDebug(
+            "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} amostras={Amostras} dimensaoVetor={DimensaoVetor} endpoint={Endpoint}",
+            "backend.ml_api.enrollment_enviando",
+            "enrollment",
+            usuario.Id,
+            usuario.Nome,
+            vetores.Count,
+            dimensao,
+            "/api/enrollment");
+
         using var respostaHttp = await _httpClient.PostAsJsonAsync("/api/enrollment", payload, JsonOpcoes, cancellationToken);
+        var duracaoMs = Math.Round(_relogio.GetElapsedTime(inicio).TotalMilliseconds, 2);
+
+        if (!respostaHttp.IsSuccessStatusCode)
+        {
+            _logger.LogDebug(
+                "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} statusCode={StatusCode} duracaoMs={DuracaoMs}",
+                "backend.ml_api.erro_http",
+                "enrollment",
+                usuario.Id,
+                usuario.Nome,
+                (int)respostaHttp.StatusCode,
+                duracaoMs);
+        }
+
         respostaHttp.EnsureSuccessStatusCode();
 
         var resposta = await respostaHttp.Content.ReadFromJsonAsync<RespostaTreinamentoMlApi>(JsonOpcoes, cancellationToken);
+        _logger.LogDebug(
+            "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} statusCode={StatusCode} modelId={ModelId} modelVersion={ModelVersion} duracaoMs={DuracaoMs}",
+            "backend.ml_api.enrollment_resposta",
+            "enrollment",
+            usuario.Id,
+            usuario.Nome,
+            (int)respostaHttp.StatusCode,
+            resposta?.ModelId,
+            resposta?.ModelVersion,
+            duracaoMs);
         return resposta?.ModelId;
     }
 
@@ -52,7 +97,31 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
             tentativa.Valores,
             RecordSample: false);
 
+        var inicio = _relogio.GetTimestamp();
+        _logger.LogDebug(
+            "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} dimensaoVetor={DimensaoVetor} endpoint={Endpoint}",
+            "backend.ml_api.authenticate_enviando",
+            "login",
+            usuario.Id,
+            usuario.Nome,
+            tentativa.Valores.Length,
+            "/api/authenticate");
+
         using var respostaHttp = await _httpClient.PostAsJsonAsync("/api/authenticate", payload, JsonOpcoes, cancellationToken);
+        var duracaoMs = Math.Round(_relogio.GetElapsedTime(inicio).TotalMilliseconds, 2);
+
+        if (!respostaHttp.IsSuccessStatusCode)
+        {
+            _logger.LogDebug(
+                "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} statusCode={StatusCode} duracaoMs={DuracaoMs}",
+                "backend.ml_api.erro_http",
+                "login",
+                usuario.Id,
+                usuario.Nome,
+                (int)respostaHttp.StatusCode,
+                duracaoMs);
+        }
+
         respostaHttp.EnsureSuccessStatusCode();
 
         var resposta = await respostaHttp.Content.ReadFromJsonAsync<RespostaAutenticacaoMlApi>(JsonOpcoes, cancellationToken)
@@ -63,6 +132,20 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
         var limiar = resposta.Threshold ?? resposta.ThresholdScore ?? _opcoes.LimiarConfianca;
         var mediaHoldPerfilMs = resposta.UserAverageHoldTimeMs ?? 0d;
         var deveGravarParaRetreino = resposta.ShouldRecordForRetraining ?? false;
+
+        _logger.LogDebug(
+            "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} statusCode={StatusCode} decisao={Decisao} confianca={Confianca} limiar={Limiar} modelId={ModelId} gravarParaRetreino={GravarParaRetreino} duracaoMs={DuracaoMs}",
+            "backend.ml_api.authenticate_resposta",
+            "login",
+            usuario.Id,
+            usuario.Nome,
+            (int)respostaHttp.StatusCode,
+            decisao,
+            Math.Round(confianca, 4),
+            Math.Round(limiar, 4),
+            resposta.ModelId,
+            deveGravarParaRetreino,
+            duracaoMs);
 
         return new ResultadoVerificacao(decisao, confianca, limiar, mediaHoldPerfilMs, resposta.ModelId, deveGravarParaRetreino);
     }
