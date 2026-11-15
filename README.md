@@ -20,10 +20,16 @@ Testes: `dotnet test`.
 | Método | Rota | Slice |
 |---|---|---|
 | POST | `/api/register` | `Features/Cadastro/CadastrarUsuario.cs` |
+| POST | `/api/change-password` | `Features/Senha/AlterarSenha.cs` |
 | POST | `/api/authenticate` | `Features/Login/Autenticar.cs` |
 | GET | `/api/health` | `Features/Saude/VerificarSaude.cs` |
+| GET | `/api/session` | `Features/Sessao/ValidarSessao.cs` |
 
 O `POST /api/register` é o endpoint único de cadastro: recebe `username`, `password` e as 5 `samples` de digitação, cria o usuário, persiste as amostras e treina o modelo inicial.
+
+O `POST /api/change-password` recebe `username`, `currentPassword`, `newPassword` e as 5 `samples` da nova senha. Ele valida a senha atual, atualiza o hash e `data_mudanca_senha`, invalida a biometria anterior, treina o novo modelo de forma síncrona e só então conclui a troca. Se o treinamento falhar, senha, data e biometria anteriores são restaurados e as amostras novas são removidas.
+
+O `GET /api/session` valida o JWT no header `Authorization: Bearer ...` e compara a claim `pwd` com a `data_mudanca_senha` atual. Tokens emitidos antes de uma troca de senha passam a ser recusados com `401`.
 
 OpenAPI em `/openapi/v1.json` (Development).
 
