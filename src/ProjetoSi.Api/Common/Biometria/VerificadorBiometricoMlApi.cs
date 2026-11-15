@@ -154,6 +154,41 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
     }
 
     // PostAsJsonAsync usa Transfer-Encoding: chunked; a ML API (WSGI/Gunicorn) não lê esse formato.
+    public async Task ReverterModelosCriadosAposAsync(
+        Usuario usuario,
+        DateTimeOffset criadoApos,
+        CancellationToken cancellationToken)
+    {
+        var payload = new RequisicaoRollbackModelosMlApi(usuario.Nome, usuario.Id, criadoApos);
+
+        using var conteudo = CriarConteudoJson(payload);
+        using var respostaHttp = await _httpClient.PostAsync(
+            "/api/models/rollback",
+            conteudo,
+            cancellationToken);
+
+        if (!respostaHttp.IsSuccessStatusCode)
+        {
+            _logger.LogDebug(
+                "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} statusCode={StatusCode}",
+                "backend.ml_api.rollback_modelos_erro",
+                "change-password",
+                usuario.Id,
+                usuario.Nome,
+                (int)respostaHttp.StatusCode);
+        }
+
+        respostaHttp.EnsureSuccessStatusCode();
+
+        _logger.LogDebug(
+            "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} criadoApos={CriadoApos}",
+            "backend.ml_api.rollback_modelos_concluido",
+            "change-password",
+            usuario.Id,
+            usuario.Nome,
+            criadoApos);
+    }
+
     private static ByteArrayContent CriarConteudoJson<T>(T payload)
     {
         var conteudo = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(payload, JsonOpcoes));
@@ -196,4 +231,9 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
         double? UserAverageHoldTimeMs,
         long? ModelId,
         bool? ShouldRecordForRetraining = null);
+
+    public sealed record RequisicaoRollbackModelosMlApi(
+        string Username,
+        Guid UserId,
+        DateTimeOffset CreatedAfter);
 }

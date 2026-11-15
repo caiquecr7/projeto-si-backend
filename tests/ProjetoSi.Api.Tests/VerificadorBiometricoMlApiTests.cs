@@ -133,6 +133,42 @@ public class VerificadorBiometricoMlApiTests
         Assert.False(resultado.DeveGravarParaRetreino);
     }
 
+    [Fact]
+    public async Task Reverter_modelos_envia_username_userId_e_timestamp_para_ml_api()
+    {
+        HttpRequestMessage? requisicaoCapturada = null;
+        string? corpoCapturado = null;
+
+        var handler = new FakeHttpMessageHandler(async (request, ct) =>
+        {
+            requisicaoCapturada = request;
+            corpoCapturado = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"success": true, "deletedCount": 1, "activeVersion": 1}""",
+                    Encoding.UTF8,
+                    "application/json")
+            };
+        });
+
+        var verificador = CriarVerificador(handler);
+        var usuario = Usuario.Criar("ana", "hash", Agora);
+        var criadoApos = Agora.AddMinutes(1);
+
+        await verificador.ReverterModelosCriadosAposAsync(usuario, criadoApos, CancellationToken.None);
+
+        Assert.NotNull(requisicaoCapturada);
+        Assert.Equal(HttpMethod.Post, requisicaoCapturada!.Method);
+        Assert.Equal("http://localhost:8000/api/models/rollback", requisicaoCapturada.RequestUri!.ToString());
+        Assert.True(requisicaoCapturada.Content!.Headers.ContentLength > 0);
+
+        using var json = JsonDocument.Parse(corpoCapturado!);
+        Assert.Equal("ana", json.RootElement.GetProperty("username").GetString());
+        Assert.Equal(usuario.Id, json.RootElement.GetProperty("userId").GetGuid());
+        Assert.Equal(criadoApos, json.RootElement.GetProperty("createdAfter").GetDateTimeOffset());
+    }
+
     private static VerificadorBiometricoMlApi CriarVerificador(HttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler);

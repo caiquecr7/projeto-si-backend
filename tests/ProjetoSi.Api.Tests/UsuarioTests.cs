@@ -38,6 +38,21 @@ public class UsuarioTests
     }
 
     [Fact]
+    public void Restaurar_credenciais_volta_hash_data_e_biometria()
+    {
+        var usuario = Usuario.Criar("ana", "hash-antigo", Agora);
+        usuario.ConcluirCadastroBiometrico(Agora);
+        usuario.AlterarSenha("hash-novo", Agora.AddDays(1));
+
+        usuario.RestaurarCredenciais("hash-antigo", Agora, Agora);
+
+        Assert.Equal("hash-antigo", usuario.SenhaHash);
+        Assert.Equal(Agora, usuario.DataMudancaSenha);
+        Assert.Equal(Agora, usuario.BiometriaCadastradaEm);
+        Assert.True(usuario.PossuiBiometria);
+    }
+
+    [Fact]
     public void Alterar_senha_invalida_biometria_cadastrada()
     {
         var usuario = Usuario.Criar("ana", "hash", Agora);
