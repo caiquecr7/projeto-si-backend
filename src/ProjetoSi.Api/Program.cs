@@ -30,6 +30,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 builder.Services.AddSingleton<VerificadorSenha>();
 builder.Services.AddSingleton<GeradorToken>();
+builder.Services.AddScoped<ValidadorToken>();
 builder.Services.AddTransient<HandlerCorrelacaoMlApi>();
 builder.Services.AddHttpClient<IVerificadorBiometrico, VerificadorBiometricoMlApi>((provedor, cliente) =>
 {
