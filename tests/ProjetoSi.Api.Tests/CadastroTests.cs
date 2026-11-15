@@ -122,3 +122,32 @@ public class CadastroTests
             .Select((chave, indice) => (Chave: chave, Valor: indice % 3 == 2 ? 0.05d : 0.1d))
             .ToDictionary(item => item.Chave, item => item.Valor);
 }
+
+
+public class DisponibilidadeUsuarioTests
+{
+    [Theory]
+    [InlineData("  Ana.Silva  ", "ana.silva")]
+    [InlineData("usuario+tag@ufabc", "usuario+tag@ufabc")]
+    public void Normaliza_username_valido(string entrada, string esperado)
+    {
+        var erro = VerificarDisponibilidadeUsuario.ValidarNome(entrada, out var nome);
+
+        Assert.Null(erro);
+        Assert.Equal(esperado, nome);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("ab")]
+    [InlineData("nome com espaco")]
+    [InlineData("user#1")]
+    public void Rejeita_username_vazio_ou_fora_do_padrao(string? entrada)
+    {
+        var erro = VerificarDisponibilidadeUsuario.ValidarNome(entrada, out _);
+
+        Assert.NotNull(erro);
+    }
+}
