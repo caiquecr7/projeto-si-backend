@@ -80,9 +80,11 @@ public static class CadastrarUsuario
         usuario.ConcluirCadastroBiometrico(agora);
         usuario.RegistrarSucesso();
 
+        var amostras = request.Samples!.Zip(vetores, (amostra, vetor) =>
+            Amostra.DeCadastro(usuario.Id, vetor, amostra.Repetition, amostra.TotalDurationMs, agora)).ToArray();
+
         db.Usuarios.Add(usuario);
-        db.Amostras.AddRange(request.Samples!.Zip(vetores, (amostra, vetor) =>
-            Amostra.DeCadastro(usuario.Id, vetor, amostra.Repetition, amostra.TotalDurationMs, agora)));
+        db.Amostras.AddRange(amostras);
 
         try
         {
@@ -111,7 +113,25 @@ public static class CadastrarUsuario
             vetores[0].Valores.Length,
             mediaHold);
 
-        var modeloId = await verificadorBiometrico.TreinarModeloInicialAsync(usuario, vetores, cancellationToken);
+        long? modeloId;
+
+        try
+        {
+            modeloId = await verificadorBiometrico.TreinarModeloInicialAsync(usuario, vetores, cancellationToken);
+        }
+        catch (Exception excecao)
+        {
+            logger.LogDebug(
+                "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} motivo={Motivo}",
+                "backend.register.treinamento_falhou",
+                "register",
+                usuario.Id,
+                usuario.Nome,
+                excecao.GetType().Name);
+
+            await ReverterCadastroAsync(db, usuario, amostras, logger);
+            throw;
+        }
 
         logger.LogDebug(
             "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username} modelId={ModelId} samplesRegistered={SamplesRegistered} mediaHoldMs={MediaHoldMs}",
@@ -190,6 +210,31 @@ public static class CadastrarUsuario
 
         vetores = extraidos;
         return null;
+    }
+
+    private static async Task ReverterCadastroAsync(
+        AppDbContext db,
+        Usuario usuario,
+        IReadOnlyList<Amostra> amostras,
+        ILogger logger)
+    {
+        db.Amostras.RemoveRange(amostras);
+        db.Usuarios.Remove(usuario);
+
+        try
+        {
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception excecao)
+        {
+            logger.LogError(
+                excecao,
+                "evento={Evento} fluxo={Fluxo} userId={UserId} username={Username}",
+                "backend.register.reversao_falhou",
+                "register",
+                usuario.Id,
+                usuario.Nome);
+        }
     }
 
     private static Conflict<RespostaOperacao> Conflito() =>
