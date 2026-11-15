@@ -37,6 +37,7 @@ public class VerificadorBiometricoMlApiTests
         Assert.NotNull(requisicaoCapturada);
         Assert.Equal(HttpMethod.Post, requisicaoCapturada!.Method);
         Assert.Equal("http://localhost:8000/api/enrollment", requisicaoCapturada.RequestUri!.ToString());
+        Assert.True(requisicaoCapturada.Content!.Headers.ContentLength > 0);
 
         using var json = JsonDocument.Parse(corpoCapturado!);
         Assert.Equal("ana", json.RootElement.GetProperty("username").GetString());
@@ -79,6 +80,7 @@ public class VerificadorBiometricoMlApiTests
 
         Assert.NotNull(requisicaoCapturada);
         Assert.Equal("http://localhost:8000/api/authenticate", requisicaoCapturada!.RequestUri!.ToString());
+        Assert.True(requisicaoCapturada.Content!.Headers.ContentLength > 0);
 
         using var json = JsonDocument.Parse(corpoCapturado!);
         Assert.Equal("ana", json.RootElement.GetProperty("username").GetString());

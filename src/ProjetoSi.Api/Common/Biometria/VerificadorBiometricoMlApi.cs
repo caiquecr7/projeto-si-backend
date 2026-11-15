@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -55,7 +56,8 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
             dimensao,
             "/api/enrollment");
 
-        using var respostaHttp = await _httpClient.PostAsJsonAsync("/api/enrollment", payload, JsonOpcoes, cancellationToken);
+        using var conteudo = CriarConteudoJson(payload);
+        using var respostaHttp = await _httpClient.PostAsync("/api/enrollment", conteudo, cancellationToken);
         var duracaoMs = Math.Round(_relogio.GetElapsedTime(inicio).TotalMilliseconds, 2);
 
         if (!respostaHttp.IsSuccessStatusCode)
@@ -107,7 +109,8 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
             tentativa.Valores.Length,
             "/api/authenticate");
 
-        using var respostaHttp = await _httpClient.PostAsJsonAsync("/api/authenticate", payload, JsonOpcoes, cancellationToken);
+        using var conteudo = CriarConteudoJson(payload);
+        using var respostaHttp = await _httpClient.PostAsync("/api/authenticate", conteudo, cancellationToken);
         var duracaoMs = Math.Round(_relogio.GetElapsedTime(inicio).TotalMilliseconds, 2);
 
         if (!respostaHttp.IsSuccessStatusCode)
@@ -148,6 +151,14 @@ public sealed class VerificadorBiometricoMlApi : IVerificadorBiometrico
             duracaoMs);
 
         return new ResultadoVerificacao(decisao, confianca, limiar, mediaHoldPerfilMs, resposta.ModelId, deveGravarParaRetreino);
+    }
+
+    // PostAsJsonAsync usa Transfer-Encoding: chunked; a ML API (WSGI/Gunicorn) não lê esse formato.
+    private static ByteArrayContent CriarConteudoJson<T>(T payload)
+    {
+        var conteudo = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(payload, JsonOpcoes));
+        conteudo.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+        return conteudo;
     }
 
     private static DecisaoBiometrica MapearDecisao(string? decisao) =>
