@@ -21,9 +21,17 @@ public static class VerificarSaude
     public static async Task<Results<Ok<Response>, JsonHttpResult<Response>>> Executar(
         AppDbContext db,
         TimeProvider relogio,
+        ILogger<Endpoint> logger,
         CancellationToken cancellationToken)
     {
-        if (await db.Database.CanConnectAsync(cancellationToken))
+        var saudavel = await db.Database.CanConnectAsync(cancellationToken);
+        logger.LogDebug(
+            "evento={Evento} fluxo={Fluxo} bancoConectado={BancoConectado}",
+            "backend.health.verificado",
+            "health",
+            saudavel);
+
+        if (saudavel)
         {
             return TypedResults.Ok(new Response("healthy", NomeServico, relogio.GetUtcNow()));
         }

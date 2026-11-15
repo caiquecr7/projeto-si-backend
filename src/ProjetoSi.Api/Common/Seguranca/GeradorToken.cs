@@ -30,7 +30,8 @@ public sealed class GeradorToken(IOptions<JwtOptions> opcoes, TimeProvider relog
             {
                 [JwtRegisteredClaimNames.Sub] = usuario.Id.ToString(),
                 [JwtRegisteredClaimNames.UniqueName] = usuario.Nome,
-                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString()
+                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
+                ["pwd"] = usuario.DataMudancaSenha.ToUnixTimeMilliseconds()
             },
             SigningCredentials = new SigningCredentials(chave, SecurityAlgorithms.HmacSha256)
         });

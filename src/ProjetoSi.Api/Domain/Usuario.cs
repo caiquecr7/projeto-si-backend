@@ -36,6 +36,16 @@ public sealed class Usuario
 
     public void AtualizarHashSenha(string senhaHash) => SenhaHash = senhaHash;
 
+    public void RestaurarCredenciais(
+        string senhaHash,
+        DateTimeOffset dataMudancaSenha,
+        DateTimeOffset? biometriaCadastradaEm)
+    {
+        SenhaHash = senhaHash;
+        DataMudancaSenha = dataMudancaSenha;
+        BiometriaCadastradaEm = biometriaCadastradaEm;
+    }
+
     public void ConcluirCadastroBiometrico(DateTimeOffset agora) => BiometriaCadastradaEm = agora;
 
     public bool EstaBloqueado(DateTimeOffset agora) => BloqueadoAte > agora;

@@ -17,14 +17,52 @@ def post(path, body):
         return e.code, json.loads(e.read() or b"{}")
 
 
+def normalize_key_name(key):
+    if key == ".":
+        return "period"
+    if key == "5":
+        return "five"
+    if key == "Enter":
+        return "Return"
+    if len(key) == 1 and "A" <= key <= "Z":
+        return f"Shift.{key.lower()}"
+    return key
+
+
 def amostra(rep, texto, escala=1.0, jitter=8.0):
     t, eventos = 1000.0, []
+    pares = []
     for i, ch in enumerate(texto):
         hold = (90 + (i % 3) * 15) * escala + random.uniform(-jitter, jitter)
-        eventos.append({"key": ch, "code": "Key", "pressTime": round(t, 2), "releaseTime": round(t + hold, 2)})
+        press_time = round(t, 2)
+        release_time = round(t + hold, 2)
+        eventos.append({"key": ch, "code": f"Key{ch.upper()}", "timestamp": press_time, "eventType": "KEY_DOWN"})
+        eventos.append({"key": ch, "code": f"Key{ch.upper()}", "timestamp": release_time, "eventType": "KEY_UP"})
+        pares.append((ch, press_time, release_time))
         t += (160 + (i % 4) * 25) * escala + random.uniform(-jitter, jitter)
-    return {"repetition": rep, "features": {"H.a": 0.1}, "rawTimings": eventos, "textEntered": texto,
-            "totalDurationMs": round(eventos[-1]["releaseTime"] - eventos[0]["pressTime"], 2)}
+
+    features, counts = {}, {}
+    for i in range(len(pares) - 1):
+        k1 = normalize_key_name(pares[i][0])
+        k2 = normalize_key_name(pares[i + 1][0])
+        h_cnt = counts.get(f"H.{k1}", 0)
+        counts[f"H.{k1}"] = h_cnt + 1
+        features[f"H.{k1}.{h_cnt}"] = round((pares[i][2] - pares[i][1]) / 1000.0, 4)
+
+        dd_cnt = counts.get(f"DD.{k1}.{k2}", 0)
+        counts[f"DD.{k1}.{k2}"] = dd_cnt + 1
+        features[f"DD.{k1}.{k2}.{dd_cnt}"] = round((pares[i + 1][1] - pares[i][1]) / 1000.0, 4)
+
+        ud_cnt = counts.get(f"UD.{k1}.{k2}", 0)
+        counts[f"UD.{k1}.{k2}"] = ud_cnt + 1
+        features[f"UD.{k1}.{k2}.{ud_cnt}"] = round((pares[i + 1][1] - pares[i][2]) / 1000.0, 4)
+
+    last_key = normalize_key_name(pares[-1][0])
+    h_cnt = counts.get(f"H.{last_key}", 0)
+    features[f"H.{last_key}.{h_cnt}"] = round((pares[-1][2] - pares[-1][1]) / 1000.0, 4)
+
+    return {"repetition": rep, "features": features, "rawTimings": eventos, "textEntered": texto,
+            "totalDurationMs": round(eventos[-1]["timestamp"] - eventos[0]["timestamp"], 2)}
 
 
 def check(nome, cond, info):

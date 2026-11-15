@@ -12,6 +12,6 @@ public sealed class BiometriaOptions
     [Range(0d, 1d)]
     public double LimiarConfianca { get; init; } = 0.35;
 
-    [Range(0.0001d, 1d)]
-    public double DesvioMinimoSegundos { get; init; } = 0.005;
+    [Required, Url]
+    public string MlApiUrl { get; init; } = "http://localhost:8000";
 }
