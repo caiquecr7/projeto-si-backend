@@ -19,11 +19,14 @@ Testes: `dotnet test`.
 
 | Método | Rota | Slice |
 |---|---|---|
+| GET | `/api/username-availability?username=...` | `Features/Cadastro/VerificarDisponibilidadeUsuario.cs` |
 | POST | `/api/register` | `Features/Cadastro/CadastrarUsuario.cs` |
 | POST | `/api/change-password` | `Features/Senha/AlterarSenha.cs` |
 | POST | `/api/authenticate` | `Features/Login/Autenticar.cs` |
 | GET | `/api/health` | `Features/Saude/VerificarSaude.cs` |
 | GET | `/api/session` | `Features/Sessao/ValidarSessao.cs` |
+
+O `GET /api/username-availability` é uma pré-checagem usada pelo frontend antes da coleta de amostras; a unicidade continua sendo garantida por `POST /api/register` (que responde `409` em corrida).
 
 O `POST /api/register` é o endpoint único de cadastro: recebe `username`, `password` e as 5 `samples` de digitação, cria o usuário, persiste as amostras e treina o modelo inicial.
 
