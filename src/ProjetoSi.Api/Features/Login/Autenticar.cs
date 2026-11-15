@@ -49,9 +49,19 @@ public static class Autenticar
             return TypedResults.BadRequest(RespostaOperacao.Falha("Campos obrigatórios ausentes: username e passwordAttempt."));
         }
 
-        if (request.Sample is not { } amostra || !VetorCaracteristicas.TentarExtrair(amostra.RawTimings, out var tentativa))
+        if (request.Sample is not { } amostra || !double.IsFinite(amostra.TotalDurationMs) || amostra.TotalDurationMs < 0d)
         {
-            return TypedResults.BadRequest(RespostaOperacao.Falha("A amostra de digitação possui tempos de tecla inválidos."));
+            return TypedResults.BadRequest(RespostaOperacao.Falha("A amostra de digitação é obrigatória e deve conter duração total válida."));
+        }
+
+        if (!string.IsNullOrEmpty(amostra.TextEntered) && !string.Equals(amostra.TextEntered, request.PasswordAttempt, StringComparison.Ordinal))
+        {
+            return TypedResults.BadRequest(RespostaOperacao.Falha("O texto informado na amostra não coincide com passwordAttempt."));
+        }
+
+        if (!VetorCaracteristicas.TentarExtrair(amostra.Features, request.PasswordAttempt, out var tentativa))
+        {
+            return TypedResults.BadRequest(RespostaOperacao.Falha("As features da amostra de digitação são inválidas ou incompatíveis com a senha informada."));
         }
 
         var limiar = biometria.Value.LimiarConfianca;
@@ -86,7 +96,10 @@ public static class Autenticar
         var resultado = await verificadorBiometrico.VerificarAsync(usuario, tentativa, cancellationToken);
         var tempoInferencia = relogio.GetElapsedTime(inicioInferencia);
 
-        db.Amostras.Add(Amostra.DeLogin(usuario.Id, tentativa, amostra.TotalDurationMs, resultado, agora));
+        if (resultado.DeveGravarParaRetreino)
+        {
+            db.Amostras.Add(Amostra.DeLogin(usuario.Id, tentativa, amostra.TotalDurationMs, resultado, agora));
+        }
 
         TokenAcesso? token = null;
 

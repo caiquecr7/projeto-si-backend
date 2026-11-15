@@ -28,6 +28,7 @@ public static class RegistrarAmostrasCadastro
         Request request,
         AppDbContext db,
         VerificadorSenha verificadorSenha,
+        IVerificadorBiometrico verificadorBiometrico,
         IOptions<BiometriaOptions> biometria,
         IOptions<SegurancaLoginOptions> seguranca,
         TimeProvider relogio,
@@ -56,17 +57,17 @@ public static class RegistrarAmostrasCadastro
 
         foreach (var amostra in request.Samples)
         {
-            if (!VetorCaracteristicas.TentarExtrair(amostra.RawTimings, out var vetor))
+            if (!double.IsFinite(amostra.TotalDurationMs) || amostra.TotalDurationMs < 0d)
             {
-                return Invalida($"A amostra {amostra.Repetition} possui tempos de tecla inválidos.");
+                return Invalida($"A amostra {amostra.Repetition} possui duração total inválida.");
+            }
+
+            if (!VetorCaracteristicas.TentarExtrair(amostra.Features, senhaDigitada, out var vetor))
+            {
+                return Invalida($"A amostra {amostra.Repetition} possui features inválidas ou incompatíveis com a senha.");
             }
 
             vetores.Add(vetor);
-        }
-
-        if (vetores.Select(vetor => vetor.QuantidadeTeclas).Distinct().Count() != 1)
-        {
-            return Invalida("As amostras possuem quantidades de teclas diferentes.");
         }
 
         var nome = NomeUsuario.Normalizar(request.Username);
@@ -107,6 +108,8 @@ public static class RegistrarAmostrasCadastro
         {
             return TypedResults.Conflict(RespostaOperacao.Falha("A coleta de amostras já está sendo processada."));
         }
+
+        await verificadorBiometrico.TreinarModeloInicialAsync(usuario, vetores, cancellationToken);
 
         var mediaHold = Math.Round(vetores.Average(vetor => vetor.MediaHoldMs), 1);
 

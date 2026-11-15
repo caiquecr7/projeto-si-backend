@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using ProjetoSi.Api.Common.Biometria;
 using ProjetoSi.Api.Common.Endpoints;
 using ProjetoSi.Api.Common.Seguranca;
@@ -25,7 +26,11 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
 builder.Services.AddSingleton<VerificadorSenha>();
 builder.Services.AddSingleton<GeradorToken>();
-builder.Services.AddScoped<IVerificadorBiometrico, VerificadorManhattanEscalonado>();
+builder.Services.AddHttpClient<IVerificadorBiometrico, VerificadorBiometricoMlApi>((provedor, cliente) =>
+{
+    var opcoes = provedor.GetRequiredService<IOptions<BiometriaOptions>>().Value;
+    cliente.BaseAddress = new Uri(opcoes.MlApiUrl);
+});
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins(builder.Configuration.GetSection("Cors:Origens").Get<string[]>() ?? [])
