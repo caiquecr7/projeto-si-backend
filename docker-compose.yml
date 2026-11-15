@@ -16,6 +16,23 @@ services:
       timeout: 3s
       retries: 10
 
+  ml-api:
+    build: ../projeto_si_ml_api
+    container_name: projeto-si-ml-api
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-docker-secret-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,ml-api,api}
+      DATABASE_URL: postgres://projeto_si:${POSTGRES_PASSWORD:-projeto_si_dev}@postgres:5432/projeto_si
+      BIOMETRICS_MODELS_DIR: /app/models_data
+    ports:
+      - "${ML_API_PORT:-8000}:8000"
+    volumes:
+      - models-data:/app/models_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build: .
     container_name: projeto-si-api
@@ -23,6 +40,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: "5000"
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=projeto_si;Username=projeto_si;Password=${POSTGRES_PASSWORD:-projeto_si_dev}
+      Biometria__MlApiUrl: ${ML_API_URL:-http://ml-api:8000}
     ports:
       - "${API_PORT:-5000}:5000"
     networks:
@@ -32,6 +50,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ml-api:
+        condition: service_started
 
   frontend:
     profiles: ["frontend"]
@@ -44,3 +64,4 @@ services:
 
 volumes:
   postgres-data:
+  models-data:
