@@ -20,9 +20,10 @@ Testes: `dotnet test`.
 | Método | Rota | Slice |
 |---|---|---|
 | POST | `/api/register` | `Features/Cadastro/CadastrarUsuario.cs` |
-| POST | `/api/enrollment` | `Features/Cadastro/RegistrarAmostrasCadastro.cs` |
 | POST | `/api/authenticate` | `Features/Login/Autenticar.cs` |
 | GET | `/api/health` | `Features/Saude/VerificarSaude.cs` |
+
+O `POST /api/register` é o endpoint único de cadastro: recebe `username`, `password` e as 5 `samples` de digitação, cria o usuário, persiste as amostras e treina o modelo inicial.
 
 OpenAPI em `/openapi/v1.json` (Development).
 
