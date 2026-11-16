@@ -26,6 +26,10 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,ml-api,api}
       DATABASE_URL: postgres://projeto_si:${POSTGRES_PASSWORD:-projeto_si_dev}@postgres:5432/projeto_si
       BIOMETRICS_MODELS_DIR: /app/models_data
+      BIOMETRICS_ALGORITHM: ${BIOMETRICS_ALGORITHM:-M2005_IDB}
+      BIOMETRICS_M2005_VARIANT: ${BIOMETRICS_M2005_VARIANT:-idb}
+      BIOMETRICS_THRESHOLD_METHOD: ${BIOMETRICS_THRESHOLD_METHOD:-min_non_outlier}
+      BIOMETRICS_THRESHOLD_DYNAMIC: ${BIOMETRICS_THRESHOLD_DYNAMIC:-True}
     ports:
       - "${ML_API_PORT:-8000}:8000"
     volumes:
