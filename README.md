@@ -1,4 +1,4 @@
-# projeto_si_backend
+# projeto-si-backend
 
 API de cadastro, coleta de amostras, troca de senha e login biométrico por dinâmica de digitação.
 **.NET 10**, Minimal API, Vertical Slice, PostgreSQL (EF Core + Npgsql) e integração HTTP com a `projeto_si_ml_api`.
@@ -94,7 +94,7 @@ Principais chaves de `appsettings.json` / variáveis de ambiente:
 | `DEBUG_LOGS` | `true` no Compose / `false` em produção | Habilita logs estruturados de depuração. |
 | `ASPNETCORE_ENVIRONMENT` | `Development` no Compose | Define comportamento de migração/OpenAPI. |
 
-Em produção, `Jwt__Chave` (mínimo 32 caracteres) e `ConnectionStrings__Postgres` precisam vir de variáveis de ambiente; sem elas a API não inicia.
+Em produção, `Jwt__Chave` (mínimo 32 caracteres) e `ConnectionStrings__Postgres` precisam vir de variáveis de ambiente; sem a chave JWT a API não inicia e, sem a conexão, as operações de banco falham.
 
 ---
 
@@ -121,10 +121,10 @@ OpenAPI em `/openapi/v1.json` (somente em `Development`).
     {
       "repetition": 1,
       "features": {
-        "H.period": 0.1491,
-        "DD.period.t": 0.3979,
-        "UD.period.t": 0.2488,
-        "H.t": 0.1069,
+        "H.period.0": 0.1491,
+        "DD.period.t.0": 0.3979,
+        "UD.period.t.0": 0.2488,
+        "H.t.0": 0.1069,
         "...": "..."
       },
       "textEntered": ".tie5Roanl",
@@ -134,7 +134,7 @@ OpenAPI em `/openapi/v1.json` (somente em `Development`).
 }
 ```
 
-`rawTimings` pode ser enviado pelo frontend, mas é ignorado pelo backend. A senha textual **não** é persistida: apenas o hash PBKDF2 é armazenado; as features são convertidas para o vetor posicional `double[]` (`3n - 2`).
+As chaves de `features` incluem o sufixo sequencial gerado por `computeSample` (`H.t.0`, `DD.t.e.0`, ...). O exemplo acima é abreviado: o backend exige exatamente 5 amostras. `rawTimings` pode ser enviado pelo frontend, mas é ignorado pelo backend. A senha textual **não** é persistida: apenas o hash PBKDF2 é armazenado; as features são convertidas para o vetor posicional `double[]` (`3n - 2`).
 
 ### Exemplo de autenticação
 
@@ -144,7 +144,7 @@ OpenAPI em `/openapi/v1.json` (somente em `Development`).
   "passwordAttempt": ".tie5Roanl",
   "sample": {
     "repetition": 1,
-    "features": { "H.period": 0.1510, "DD.period.t": 0.3902, "UD.period.t": 0.2392, "...": "..." },
+    "features": { "H.period.0": 0.1510, "DD.period.t.0": 0.3902, "UD.period.t.0": 0.2392, "...": "..." },
     "textEntered": ".tie5Roanl",
     "totalDurationMs": 2280.17
   }
@@ -157,7 +157,7 @@ Resposta `200` (resumida):
 {
   "decision": "GENUINE",
   "confidenceScore": 0.931,
-  "thresholdScore": 0.712,
+  "thresholdScore": 0.68,
   "inferenceTimeMs": 4.82,
   "message": "Padrão biométrico compatível com o perfil legítimo cadastrado.",
   "userAverageHoldTimeMs": 112,
@@ -179,7 +179,7 @@ Senha textual incorreta, conta bloqueada ou biometria não concluída retornam `
 - **Validação de features:** cada amostra precisa ter exatamente as chaves `H`/`DD`/`UD` esperadas para a senha, na ordem cronológica correta, com `H, DD ∈ (0, 5]` segundos e `UD ∈ [-5, 5]` segundos.
 - **Persistência seletiva no login**: o backend persiste amostras de `Login` somente quando a ML API retorna `shouldRecordForRetraining: true` (amostra `GENUINE` com confiança acima da banda de incerteza).
 - **Amostras da senha vigente**: `coletada_em >= usuarios.data_mudanca_senha`.
-- **`modelos`** junta Modelos + Versão do rascunho: cada versão tem seu próprio `caminho_arquivo`; versão ativa = maior `versao` do usuário. A ML API isola modelos criados antes de `data_mudanca_senha` e permite rollback via `/api/models/rollback`.
+- **`modelos`** armazena cada versão treinada com seu próprio `caminho_arquivo`; a ML API escolhe a versão ativa considerando apenas `criado_em >= data_mudanca_senha`, respeitando `active_version.json`, e permite rollback via `/api/models/rollback`.
 - **Verificador biométrico** atrás de `IVerificadorBiometrico` (`VerificadorBiometricoMlApi`), delegando o treinamento inicial (`/api/enrollment`) e a inferência biométrica (`/api/authenticate`) para a `projeto_si_ml_api` via HTTP (`Biometria:MlApiUrl`).
 - **JWT após troca de senha**: a claim `pwd` é comparada com `data_mudanca_senha` em `GET /api/session`; tokens antigos deixam de valer imediatamente.
 - **Bloqueio**: 5 falhas (senha errada ou impostor) bloqueiam por 15 min. Configurável em `SegurancaLogin`.
